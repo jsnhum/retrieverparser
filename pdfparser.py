@@ -10,11 +10,28 @@ def extract_toc_from_pdf(pdf_file):
     articles_toc = []
     
     with pdfplumber.open(pdf_file) as pdf:
-        # Extract TOC from first few pages
+        # Extract TOC - read until we find the first article page
+        # TOC pages have many lines with date+page pattern
+        # Article pages have different structure
         toc_text = ""
-        for page_num in range(min(4, len(pdf.pages))):
+        toc_end_page = 4  # Default minimum
+        
+        for page_num in range(min(30, len(pdf.pages))):
             page_text = pdf.pages[page_num].extract_text()
+            
+            # Count lines that look like TOC entries
+            lines = page_text.split('\n')
+            toc_like_lines = sum(1 for line in lines 
+                                if re.search(r'\d{4}-\d{2}-\d{2}\s+\d{1,4}$', line.strip()))
+            
+            # If this page has very few TOC lines and we've read at least 4 pages,
+            # we've probably reached the articles section
+            if toc_like_lines < 5 and page_num >= 4:
+                toc_end_page = page_num
+                break
+            
             toc_text += page_text + "\n"
+            toc_end_page = page_num + 1
         
         lines = toc_text.split('\n')
         
@@ -24,7 +41,7 @@ def extract_toc_from_pdf(pdf_file):
             # Skip headers and section markers
             if not line or 'Kandidatuppsats' in line or 'Datum 2026' in line or 'Tidningsartiklar' in line:
                 continue
-            if line in ['heder, hedersrelaterat', 'Tidningar', 'Tidning', 'Heders', 'Allehanda', 'Socialdemokraten']:
+            if line in ['heder, hedersrelaterat', 'Tidningar', 'Tidning', 'Heders', 'Allehanda', 'Socialdemokraten', 'Nyheter', 'Nyheter -']:
                 continue
             
             # Pattern: Title \ue618 Source Date PageNumber
