@@ -242,15 +242,20 @@ def main():
         st.success("✅ PDF file uploaded successfully!")
         
         with st.expander("🔍 Preview raw PDF text (for debugging)"):
-            with pdfplumber.open(uploaded_file) as pdf:
-                preview_text = ""
-                for page in pdf.pages[:2]:
-                    preview_text += page.extract_text() + "\n"
-            st.text_area("Raw text", preview_text[:3000], height=400)
+            try:
+                with pdfplumber.open(uploaded_file) as pdf:
+                    preview_text = ""
+                    for page in pdf.pages[:2]:
+                        preview_text += page.extract_text() + "\n"
+                st.text_area("Raw text", preview_text[:3000], height=400)
+            except Exception as e:
+                st.error(f"Error reading PDF preview: {str(e)}")
         
         if st.button("🔍 Parse PDF", type="primary"):
             with st.spinner("Parsing PDF..."):
                 try:
+                    # Reset file pointer
+                    uploaded_file.seek(0)
                     articles = parse_retriever_pdf(uploaded_file)
                     
                     if articles:
@@ -272,7 +277,7 @@ def main():
                         
                         st.subheader("📋 Article Preview")
                         preview_df = df[['Title', 'Source', 'Date', 'Author', 'Word_Count']].copy()
-                        st.dataframe(preview_df, width='content', height=400)
+                        st.dataframe(preview_df, width='stretch', height=400)
                         
                         with st.expander("📖 View article details"):
                             if len(df) > 0:
@@ -341,19 +346,37 @@ def main():
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             )
                         
+                        # Fixed bar charts
                         st.subheader("📊 Articles by Source")
                         source_counts = df['Source'].value_counts().head(15)
-                        st.bar_chart(source_counts)
+                        if not source_counts.empty:
+                            # Convert to DataFrame for st.bar_chart
+                            source_df = pd.DataFrame({
+                                'Count': source_counts.values
+                            }, index=source_counts.index)
+                            st.bar_chart(source_df)
+                        else:
+                            st.info("No source data available")
                         
-                        st.subheader("📈 Word Count Distribution")
-                        st.bar_chart(df['Word_Count'].head(30))
+                        st.subheader("📈 Word Count Distribution (Top 30 Articles)")
+                        if len(df) > 0:
+                            # Get top 30 articles by word count
+                            top_articles = df.nlargest(30, 'Word_Count')[['Title', 'Word_Count']].copy()
+                            # Use first 40 chars of title as index
+                            top_articles['Short_Title'] = top_articles['Title'].str[:40]
+                            top_articles = top_articles.set_index('Short_Title')[['Word_Count']]
+                            st.bar_chart(top_articles)
+                        else:
+                            st.info("No word count data available")
                         
                     else:
                         st.warning("⚠️ No articles were extracted from the PDF.")
+                        st.info("This might happen if the PDF structure is different from expected. Check the raw preview above.")
                         
                 except Exception as e:
                     st.error(f"❌ Error parsing PDF: {str(e)}")
                     st.exception(e)
+                    st.info("💡 Tip: Check the raw PDF preview above to see if the text is extractable.")
     
     with st.sidebar:
         st.header("📖 Instructions")
@@ -386,7 +409,7 @@ def main():
         news database using the table of contents
         for accurate article identification.
         
-        **Version:** 7.0 (Simplified, correct structure parsing)
+        **Version:** 7.1 (Fixed bar charts & error handling)
         """)
 
 
