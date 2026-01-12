@@ -272,7 +272,7 @@ def main():
                         
                         st.subheader("📋 Article Preview")
                         preview_df = df[['Title', 'Source', 'Date', 'Author', 'Word_Count']].copy()
-                        st.dataframe(preview_df, width=True, height=400)
+                        st.dataframe(preview_df, width='stretch', height=400)
                         
                         with st.expander("📖 View article details"):
                             if len(df) > 0:
